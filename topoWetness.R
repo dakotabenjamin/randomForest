@@ -22,29 +22,27 @@ topo <- readOGR("topo", "ms-test-points-all")
 topo <- subset(topo, !is.na(topo$ms_test_to))
 
 #pull coordinates and data in their own data frames
-topo.coords <- coordinates(topo)
 topo.data <- topo@data
 
 #Remove columns with NAs (found manually)
 topo.data$veg_class <- NULL
 topo.data$hgm_class <- NULL
-topo.data$ms_test_cl <- NULL
+#topo.data$ms_test_cl <- NULL
 topo.data$unique_id <- NULL
 
 #for any point (row) with NA, delete that point
 topo.data <- topo.data[complete.cases(topo.data),]
 
 # RandomForest ----
-model <- topo.data$gid ~ topo.data$area_acres * topo.data$poly_type * topo.data$ms_test__1 * topo.data$ms_test__2 * topo.data$ms_test__3 * topo.data$ms_test_lo * topo.data$ms_test_co * topo.data$ms_test_as * topo.data$ms_test_xs * topo.data$ms_test_sl * topo.data$ms_test_ch * topo.data$ms_test_ls * topo.data$ms_test_to * topo.data$ms_test_va * topo.data$ms_test_ca * topo.data$ms_test_ve * topo.data$ms_test_re
 
 set.seed(17)
-topo.rf <- randomForest(topo.data$gid ~ topo.data$area_acres * topo.data$poly_type * topo.data$ms_test__1 * topo.data$ms_test__2 * topo.data$ms_test__3 * topo.data$ms_test_lo * topo.data$ms_test_co * topo.data$ms_test_as * topo.data$ms_test_xs * topo.data$ms_test_sl * topo.data$ms_test_ch * topo.data$ms_test_ls * topo.data$ms_test_to * topo.data$ms_test_va * topo.data$ms_test_ca * topo.data$ms_test_ve * topo.data$ms_test_re, importance=T, do.trace=100)
+topo.rf <- randomForest(as.factor(topo.data$gid) ~ ms_test_ch + ms_test_ve + ms_test_cl + ms_test_re + ms_test_va + ms_test__1 + ms_test__2 + ms_test__3, 
+                        data=topo.data, type=classification, importance=T, do.trace=100)
 
 print(topo.rf)
 
 par(mfrow=c(2,1))
 for (i in 1:2) {
-  pl1 <- plot(sort(topo.rf$importance[,i], dec = T),
-       type="h", xaxt="n", main=paste("Measure ", i))
-  axis(1, at=1:19, labels=names(topo.rf$forest$xlevels), las=3)
+  pl1 <- barplot(sort(topo.rf$importance[,i]),
+       main=paste("Measure ", i))
   }

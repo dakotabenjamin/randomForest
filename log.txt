@@ -1,0 +1,50 @@
+commit 5c306084cca1b27013006e2f347eb97574c67b1a
+Author: Dakota Benjamin <dakota.benjamin@gmail.com>
+Date:   Wed Jun 11 08:23:20 2014 -0400
+
+    added wetlandtest.r and its associated shape file
+
+
+commit 4d532c92f996268cb8f8d92d73997f5fe29af4eb
+Author: Dakota Benjamin <dakota.benjamin@gmail.com>
+Date:   Tue Jun 10 18:28:57 2014 -0400
+
+    updated gitignore so that it wouldn't add the huge dem
+
+
+commit b6859564926ccba89aaee13bac241ca02e756879
+Author: Dakota Benjamin <dakota.benjamin@gmail.com>
+Date:   Tue Jun 10 18:11:48 2014 -0400
+
+    06-10-2014: added party random forest and graphed proximity
+
+
+commit 042d01286d8d5187aa81eeed52aa7541998f46ed
+Author: dakotabenjamin <dakota.benjamin@gmail.com>
+Date:   Tue Jun 10 08:41:44 2014 -0400
+
+    using full model
+
+commit 62e858246a2931eed00f8fac33ab39134fdd7f6c
+Author: Dakota Benjamin <dakota.benjamin@gmail.com>
+Date:   Thu Jun 5 16:07:35 2014 -0400
+
+    Got some stuff working, some not.
+
+commit 93e90c52bd439f24aa0f8b62bace6585f3322259
+Author: Dakota Benjamin <dakota.benjamin@gmail.com>
+Date:   Thu Jun 5 14:50:56 2014 -0400
+
+    Practicing commits
+
+commit 5875172968ede3654a97e3e3263336328b7e994c
+Author: Dakota Benjamin <dakota.benjamin@gmail.com>
+Date:   Thu Jun 5 13:14:44 2014 -0400
+
+    added readme
+
+commit 3ae3bcd0319e9fb638cad257f172c27649470832
+Author: Dakota Benjamin <dakota.benjamin@gmail.com>
+Date:   Thu Jun 5 13:05:46 2014 -0400
+
+    Initial Commit. Playing around with Random Forest
