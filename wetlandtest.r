@@ -16,68 +16,66 @@ library(rgdal) #bindings for GDAL
 #setwd("~/randomForest")
 
 # Get and format data ----
-
-topo <- readOGR("saga", "wetland-sample")
-
+topo <- readOGR("data", "wetland-sample")
 topo.data <- topo@data
-topo.data <- subset(topo.data, !is.na(topo.data$ms_test__1))
 
 #set NAs to 0 in test_cl
 topo.data$ms_test_cl[is.na(topo.data$ms_test_cl)] <- 0
 
-#make a new column to show whether it is a wetland or not. if no gid -> not wetland
+#delete data with NAs
+topo.data$gid <- NULL
+topo.data$area_acres <- NULL
+topo.data <- topo.data[complete.cases(topo.data),]
 
+#make a new column to show whether it is a wetland or not. if no gid -> not wetland
 topo.data$is.wetland <- "yes"
 
 for(i in 1:nrow(topo.data)) {
   if(!is.na(topo.data$gid[i]))
     topo.data$is.wetland[i] <- "no"
 }
-topo.data$gid <- NULL
-topo.data$area_acres <- NULL
-topo.data <- topo.data[complete.cases(topo.data),]
 
 # Random Forest ----
-
-#Tune the RF to get the optimal mtry and ntree values
-
-
 set.seed(171)
 topo.rf <- randomForest(as.factor(is.wetland) ~ ., 
-                        data=topo.data, importance=T, do.trace=100, proximity=T)
+        data=topo.data, importance=T, do.trace=100, proximity=T)
 print(topo.rf)
 
+#Barplot of Variable Importance
 par(mfrow=c(2,2))
 for (i in 1:4) {
   barplot(sort(topo.rf$importance[,i], dec=T),
-                 main=attributes(topo.rf$importance)$dimnames[[2]][i], cex.names=0.6)
-
+         main=attributes(topo.rf$importance)$dimnames[[2]][i], cex.names=0.6)
 }
 
 # Outliers
-#topo.rf.mds <- cmdscale(1-proximity(topo.rf), eig=T)
 outlier <- outlier(topo.rf)
-barplot(outlier)
-# PRedicting classification on a set of definitely wetland data: ----
+par(mfcol=c(1,1))
+barplot(outlier, main="Outlier data points in the RF")
 
-defwet <- readOGR("topo", "ms-test-points-all")
-defwet <- subset(defwet, !is.na(defwet$ms_test_to))
+# Predicting classification on a set of definitely wetland data: ----
+#Retrieve the data and format it like above
+defwet <- readOGR("data", "ms-test-points-all")
+# defwet <- subset(defwet, !is.na(defwet$ms_test_to))
 defwet.data <- defwet@data
 defwet.data$iswetland <- 0
-
 defwet.data$ms_test_cl[is.na(defwet.data$ms_test_cl)] <- 0
+defwet.data <- defwet.data[complete.cases(defwet.data[,8:24]),]
 
+#Make the prediction
 defwet.data$iswetland<-predict(topo.rf, defwet.data)
 
+#Histogram showing the number of predicted wetlands. Should be near 100%
 hist(as.numeric(defwet.data$iswetland), breaks=2)
-
+#summary(defwet.data$iswetland)
+print(paste("Percent wrong:", round(table(defwet.data$iswetland)[1]/table(defwet.data$iswetland)[2]*100, 2),"%"))
 
 #Partial Dependence Plot----
 par(mfcol=c(2,2))
-partialPlot(topo.rf, topo.data, "ms_test_va")
-partialPlot(topo.rf, topo.data, "ms_test_re")
-partialPlot(topo.rf, topo.data, "ms_test_ve")
-partialPlot(topo.rf, topo.data, "ms_test__1")
+partialPlot(topo.rf, topo.data, "ms_test_va", "yes")
+partialPlot(topo.rf, topo.data, "ms_test_re", "yes")
+partialPlot(topo.rf, topo.data, "ms_test_ve", "yes")
+partialPlot(topo.rf, topo.data, "ms_test__1", "yes")
 
 #library(rgl)
 #surface3d()

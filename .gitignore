@@ -2,4 +2,6 @@
 .Rhistory
 .RData
 ch11.pdf
-saga/cm_dem_10.tif
+cm_boundaries/*
+topo/*
+topoWetness/*
