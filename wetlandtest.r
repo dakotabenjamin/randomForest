@@ -42,6 +42,7 @@ topo.rf <- randomForest(as.factor(is.wetland) ~ .,
 print(topo.rf)
 
 #Barplot of Variable Importance
+# This shows how important each predictor is in the algorithm wrt each class, the mean, and the Gini index. 
 par(mfrow=c(2,2))
 for (i in 1:4) {
   barplot(sort(topo.rf$importance[,i], dec=T),
@@ -52,6 +53,8 @@ for (i in 1:4) {
 outlier <- outlier(topo.rf)
 par(mfcol=c(1,1))
 barplot(outlier, main="Outlier data points in the RF")
+# There are a lot of outliers. Unsurprising. 
+
 
 # Predicting classification on a set of definitely wetland data: ----
 #Retrieve the data and format it like above
@@ -71,6 +74,8 @@ hist(as.numeric(defwet.data$iswetland), breaks=2)
 print(paste("Percent wrong:", round(table(defwet.data$iswetland)[1]/table(defwet.data$iswetland)[2]*100, 2),"%"))
 
 #Partial Dependence Plot----
+# This will show how the random forest depends on the predictor when all other predictors are kept constant
+
 par(mfcol=c(2,2))
 partialPlot(topo.rf, topo.data, "ms_test_va", "yes")
 partialPlot(topo.rf, topo.data, "ms_test_re", "yes")
@@ -81,17 +86,17 @@ partialPlot(topo.rf, topo.data, "ms_test__1", "yes")
 #surface3d()
 
 # PARTY ON ----
-
-library(party)
-
-set.seed(1554)
-topo.cf <- cforest(as.factor(is.wetland) ~ ms_test_ve + ms_test__1 + ms_test__2 + ms_test_sl, #.,
-                   data=topo.data, control=cforest_unbiased(mtry=4, ntree=1000))
-#varimp <- varimp(topo.cf, conditional=T)
-#barplot(sort(varimp,dec=T))
-
-#Proximity Plot ----
-topo.mds <- cmdscale(1-proximity(topo.cf), eig=T)
-pairs(cbind(topo.data$ms_test__1, topo.mds$points), col=c("blue","orange")[as.numeric(as.factor(topo.data$is.wetland))])
-
-
+# 
+# library(party)
+# 
+# set.seed(1554)
+# topo.cf <- cforest(as.factor(is.wetland) ~ ms_test_ve + ms_test__1 + ms_test__2 + ms_test_sl, #.,
+#                    data=topo.data, control=cforest_unbiased(mtry=4, ntree=1000))
+# #varimp <- varimp(topo.cf, conditional=T)
+# #barplot(sort(varimp,dec=T))
+# 
+# #Proximity Plot ----
+# topo.mds <- cmdscale(1-proximity(topo.cf), eig=T)
+# pairs(cbind(topo.data$ms_test__1, topo.mds$points), col=c("blue","orange")[as.numeric(as.factor(topo.data$is.wetland))])
+# 
+# 
