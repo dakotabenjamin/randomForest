@@ -2,6 +2,7 @@
 # Dakota Benjamin
 # Cleveland Metroparks Department of Planning, Design, and Natural Resources
 # Last Updated 6/12/2014
+# Version 1.0
 
 # Intro ----
 # This script aims to provide a classification of upland and wetland community types in the Cleveland 
