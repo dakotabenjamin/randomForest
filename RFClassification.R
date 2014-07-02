@@ -26,10 +26,16 @@ library(rgdal) #bindings for GDAL
 
 # Load data ----
 
-topo <- readOGR("data", "xxxxxxx") # the topographical data
+data.OGR <- readOGR("data", "rf_rockyriver") # the topographical data
 # Infor about topo:
+# Data:
+#   com: The response, i.e. the different community types for the training set
+#   wet_com: the wetland community: actually it's empty right now. 
+#   tpi_200: the topographic position index
+data.OGR <- data.OGR[complete.cases(data.OGR@data$terrain__1),]
 
-pcap.plot.info <- read.csv("data/pcap/pcap-plot-info.csv") # The pcap data (unless it has been added in Quantum or something)
+df <- data.OGR@data
+#pcap.plot.info <- read.csv("data/pcap/pcap-plot-info.csv") # The pcap data (unless it has been added in Quantum or something)
 # Metadata for pcap-plot-info
 # plot              plot number
 # classcode	        modified NatureServe code for the community type
@@ -41,26 +47,53 @@ pcap.plot.info <- read.csv("data/pcap/pcap-plot-info.csv") # The pcap data (unle
 #Join the data together
 
 # Clean up / manipulate the data, remove NAs (or set to 0 where relevant)
+df.msr <- df[complete.cases(df$terrain__1),]
+df.train <- droplevels(df.msr[complete.cases(df.msr$com),])
+
 
 # If there is no column where classification is present, we'll have to make one. I think the PCAP will have it though
-# PCAP file with community types: pcap-plot-info.csv
 
 # Random Forest Training ----
 
 # Tune the data
-set.seed(34334)
-tune.rf <- tuneRF(rf$classification, rf[-classification])
-print(tune.rf)
+set.seed(3434)
+tune.rf <- tuneRF(df.train[,-1], df.train$com)
+  print(tune.rf)
 
 # set the seed
 set.seed(23461)
-df.rf <- randomForest(classification ~ ., 
-                        data=rf, importance=T, do.trace=100, proximity=T) # apply the proper mtry and ntree
+train.rf <- randomForest(com ~ ., 
+              data=df.train, importance=T, mtry=3, do.trace=100, proximity=T) # apply the proper mtry and ntree
 
+print(train.rf)
 # Variable Importance
+par(mfrow=c(3,4))
+for (i in 1:12) {
+  barplot(sort(train.rf$importance[,i], dec=T),
+          main=attributes(train.rf$importance)$dimnames[[2]][i], cex.names=0.6)
+}
+
+#Look at just Mean Decrease in Accuracy:
+par(mfrow=c(1,1))
+barplot(sort(train.rf$importance[,11], dec=T),main="Mean Decrease in Accuracy", cex.names=0.6)
 
 #Outliers
+outlier <- outlier(train.rf)
+par(mfcol=c(1,1))
+plot(outlier, type="h", main="Outlier data points in the RF")
 
-# Partial Dependence
+
+# Partial Dependence for wetland
+# par(mfcol=c(2,2))
+# partialPlot(train.rf, df.train, "msr_11", "wetland")
+# partialPlot(train.rf, df.train, "msr_10", "wetland")
+# partialPlot(train.rf, df.train, "msr_2", "wetland")
+# partialPlot(train.rf, df.train, "msr_9", "wetland")
+
 
 # Predicted classification ----
+# Add the predicted classifications to the OGR dataset, then write them to a shapefile.
+df.msr$predict <- predict(train.rf, df.msr, type="response")
+newdata.OGR <- data.OGR
+newdata.OGR@data <- df.msr
+writeOGR(newdata.OGR, "data", "rrPredicted", "ESRI Shapefile")
