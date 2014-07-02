@@ -23,8 +23,25 @@ rm(list=ls())
 library(randomForest) #for the random forest
 library(sp) #Classes and methods for spatial data
 library(rgdal) #bindings for GDAL
+library(raster)
 
 # Load data ----
+
+# Load the basic terrain analyses into a matrix
+terrl <- vector("list", 11)
+terrain <- matrix(nrow=11, ncol=0)
+for(i in 1:34) {
+  if(file.exists(paste("F:/Dakota/square/Output/terrain_",i,".tif",sep=""))) {
+    for(j in 1:11) {
+      terrl[j] <- raster(paste("F:/Dakota/square/Output/terrain_",i,".tif",sep=""), band=j)
+    }
+  }
+  terrain <- cbind(terrain, terrl)
+}
+
+#Now we can subset out bands or whatever into layers if we need them 
+
+plot(addLayer(terrain[1,]))
 
 data.OGR <- readOGR("data", "rf_rockyriver") # the topographical data
 # Infor about topo:
