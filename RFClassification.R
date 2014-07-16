@@ -27,72 +27,77 @@ library(raster)
 
 # Load data ----
 
-# Load the basic terrain analyses into a matrix
-terrl <- vector("list", 11)
-terrain <- matrix(nrow=11, ncol=0)
-for(i in 1:34) {
-  if(file.exists(paste("F:/Dakota/square/Output/terrain_",i,".tif",sep=""))) {
-    for(j in 1:11) {
-      terrl[j] <- raster(paste("F:/Dakota/square/Output/terrain_",i,".tif",sep=""), band=j)
-    }
-  }
-  terrain <- cbind(terrain, terrl)
-}
+# Load the basic terrain analyses
+#catchment <- raster("tifs/repr/catchment.tif")
+tpi2k <- raster("tifs/repr/tpi2k.tif")
+tpi200 <- raster("tifs/repr/tpi200.tif")
+aspect <- raster("tifs/repr/aspect.tif")
+channel_altitude <- raster("tifs/repr/channel_altitude.tif")
+channel_base <- raster("tifs/repr/channel_base.tif")
+convergence <- raster("tifs/repr/convergence.tif")
+hcurv <- raster("tifs/repr/hcurv.tif")
+vcurv <- raster("tifs/repr/vcurv.tif")
+# There is something wrong with ls-factor ls_factor <- raster("tifs/repr/ls_factor.tif")
+relative_slope_position <- raster("tifs/repr/relative_slope_position.tif")
+shade <- raster("tifs/repr/shade.tif")
+#sinks <- raster("tifs/repr/sinks.tif")
+slope <- raster("tifs/repr/slope.tif")
+twi <- raster("tifs/repr/twi.tif")
+valley_depth <- raster("tifs/repr/valley_depth.tif")
+historicalforest <- raster("tifs/repr/historicalforest.tif")
 
-#Now we can subset out bands or whatever into layers if we need them 
+predictors <- addLayer(tpi2k, tpi200, aspect, channel_altitude, channel_base, convergence, hcurv, vcurv, relative_slope_position, shade, slope, valley_depth, twi)
 
-plot(addLayer(terrain[1,]))
+# make historicalforest the same extent
+#e<- extent(predictors)
+#historicalforest <- crop(historicalforest, e)
+#historicalforest <- resample(historicalforest, predictors)
 
-data.OGR <- readOGR("data", "rf_rockyriver") # the topographical data
-# Infor about topo:
-# Data:
-#   com: The response, i.e. the different community types for the training set
-#   wet_com: the wetland community: actually it's empty right now. 
-#   tpi_200: the topographic position index
-data.OGR <- data.OGR[complete.cases(data.OGR@data$terrain__1),]
+predictors <- addLayer(predictors, historicalforest)
 
-df <- data.OGR@data
-#pcap.plot.info <- read.csv("data/pcap/pcap-plot-info.csv") # The pcap data (unless it has been added in Quantum or something)
-# Metadata for pcap-plot-info
-# plot              plot number
-# classcode	        modified NatureServe code for the community type
-# comm	            modified NatureServe community description
-# landform          type of landform on which the plot is located
-# reservation.code  two digit code unique to each reservation
+#mask out residential and water bodies
+water <- raster("tifs/repr-butmessedup/mask-water.tif")
+#water <- resample(water, predictors)
+resid <- raster("tifs/repr-butmessedup/mask-residential.tif")
 
+#beginCluster()
+predictors_masked <- mask(predictors, water, maskvalue=1, updatevalue = NA)
+predictors_masked <- mask(predictors_masked, resid, maskvalue=1, updatevalue = NA)
+#predictors_masked <- clusterR(predictors, mask, args=list(mask=water, maskvalue=1))
+#predictors_masked <- clusterR(predictors_masked, mask, args=list(mask=resid, maskvalue=1))
 
-#Join the data together
+#endCluster()
 
-# Clean up / manipulate the data, remove NAs (or set to 0 where relevant)
-df.msr <- df[complete.cases(df$terrain__1),]
-df.train <- droplevels(df.msr[complete.cases(df.msr$com),])
+#read in the training points
+points <- readOGR("data", "classes_all")
 
-
-# If there is no column where classification is present, we'll have to make one. I think the PCAP will have it though
+#extract raster values for the points
+pred <- raster::extract(predictors_masked, points)
+points@data = data.frame(points@data, pred)
+points@data <- na.omit(points@data)
+#points <- subset(points, tpi2k != NA)
+points@data <- droplevels(points@data)
 
 # Random Forest Training ----
 
-# Tune the data
-set.seed(3434)
-tune.rf <- tuneRF(df.train[,-1], df.train$com)
-  print(tune.rf)
+#ydata <- points@data$com
+#xdata <- points@data[,2:ncol(points@data)]
 
 # set the seed
 set.seed(23461)
-train.rf <- randomForest(com ~ ., 
-              data=df.train, importance=T, mtry=3, do.trace=100, proximity=T) # apply the proper mtry and ntree
+train.rf <- randomForest(com ~ ., data=points@data, importance=T, ntree=1500, do.trace=100, proximity=T, na.action=na.exclude) # apply the proper mtry and ntree
 
 print(train.rf)
 # Variable Importance
-par(mfrow=c(3,4))
-for (i in 1:12) {
+par(mfrow=c(4,4))
+for (i in 1:14) {
   barplot(sort(train.rf$importance[,i], dec=T),
           main=attributes(train.rf$importance)$dimnames[[2]][i], cex.names=0.6)
 }
 
 #Look at just Mean Decrease in Accuracy:
 par(mfrow=c(1,1))
-barplot(sort(train.rf$importance[,11], dec=T),main="Mean Decrease in Accuracy", cex.names=0.6)
+barplot(sort(train.rf$importance[,13], dec=T),main="Mean Decrease in Accuracy", cex.names=0.6)
 
 #Outliers
 outlier <- outlier(train.rf)
@@ -100,17 +105,32 @@ par(mfcol=c(1,1))
 plot(outlier, type="h", main="Outlier data points in the RF")
 
 
-# Partial Dependence for wetland
-# par(mfcol=c(2,2))
-# partialPlot(train.rf, df.train, "msr_11", "wetland")
-# partialPlot(train.rf, df.train, "msr_10", "wetland")
-# partialPlot(train.rf, df.train, "msr_2", "wetland")
-# partialPlot(train.rf, df.train, "msr_9", "wetland")
+# Predict classification and write it to a raster ----
 
+rpath=paste('~/Documents/GitHub/randomForest', "tifs/repr", sep="/")
+xvars <- stack(paste(rpath, paste(rownames(train.rf$importance), "tif", sep="."), sep="/"))
+# #not working right now ----
+# 
+#  tr <-  blockSize(predictors, n=15, minrows=127)
+# s <- raster(predictors[[1]])
+# s <- writeStart(s, filename=paste('~/GitHub/randomForest', "prob_landcover.tif", sep="/"), overwrite=TRUE)
+# # 
+#  for (i in 1:tr$n) {
+#   v <- getValuesBlock(predictors, row=tr$row[i], nrows=tr$nrows[i])
+#   v <- as.data.frame(v)
+#   rf.pred <- predict(train.rf,v, type='response')
+# #  rf.pred1 <- predict(train.rf,v, type='prob')
+#   writeValues(s, as.numeric(rf.pred), tr$row[i])
+#   cat(" Finished Block", i, ". . .", sep=" ")
+#  }
+# s <- writeStop(s)
 
-# Predicted classification ----
-# Add the predicted classifications to the OGR dataset, then write them to a shapefile.
-df.msr$predict <- predict(train.rf, df.msr, type="response")
-newdata.OGR <- data.OGR
-newdata.OGR@data <- df.msr
-writeOGR(newdata.OGR, "data", "rrPredicted", "ESRI Shapefile")
+# # try on a subset
+# e<- extent(2209444,2222142,596814,606393)
+# cropped<- crop(xvars, e)
+
+beginCluster()
+rf.pred <- clusterR(xvars, predict, args=list(model=train.rf), progress='text')
+writeRaster(rf.pred, filename = "rasterout1.tif", datatype='GTiff')
+endCluster()
+

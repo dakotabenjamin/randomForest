@@ -6,3 +6,7 @@ cm_boundaries/*
 topo/*
 topoWetness/*
 data/*
+*.tif
+*.xml
+*.qml
+tifs/*
