@@ -24,57 +24,41 @@ library(randomForest) #for the random forest
 library(sp) #Classes and methods for spatial data
 library(rgdal) #bindings for GDAL
 library(raster)
+library(snow)
 
 # Load data ----
 
 # Load the basic terrain analyses
 #catchment <- raster("tifs/repr/catchment.tif")
-tpi2k <- raster("tifs/repr/tpi2k.tif")
+#tpi2k <- raster("tifs/repr/tpi2k.tif")
 tpi200 <- raster("tifs/repr/tpi200.tif")
 aspect <- raster("tifs/repr/aspect.tif")
 channel_altitude <- raster("tifs/repr/channel_altitude.tif")
 channel_base <- raster("tifs/repr/channel_base.tif")
 convergence <- raster("tifs/repr/convergence.tif")
 hcurv <- raster("tifs/repr/hcurv.tif")
-vcurv <- raster("tifs/repr/vcurv.tif")
+#vcurv <- raster("tifs/repr/vcurv.tif")
 # There is something wrong with ls-factor ls_factor <- raster("tifs/repr/ls_factor.tif")
 relative_slope_position <- raster("tifs/repr/relative_slope_position.tif")
 shade <- raster("tifs/repr/shade.tif")
 #sinks <- raster("tifs/repr/sinks.tif")
 slope <- raster("tifs/repr/slope.tif")
-twi <- raster("tifs/repr/twi.tif")
-valley_depth <- raster("tifs/repr/valley_depth.tif")
+#twi <- raster("tifs/repr/twi.tif")
+#valley_depth <- raster("tifs/repr/valley_depth.tif")
 historicalforest <- raster("tifs/repr/historicalforest.tif")
 
-predictors <- addLayer(tpi2k, tpi200, aspect, channel_altitude, channel_base, convergence, hcurv, vcurv, relative_slope_position, shade, slope, valley_depth, twi)
+#predictors <- addLayer(tpi2k, tpi200, aspect, channel_altitude, channel_base, convergence, hcurv, vcurv, relative_slope_position, shade, slope, valley_depth, twi)
+predictors <- addLayer(tpi200, aspect, channel_altitude, channel_base, convergence, hcurv, relative_slope_position, shade, slope, historicalforest)
 
-# make historicalforest the same extent
-#e<- extent(predictors)
-#historicalforest <- crop(historicalforest, e)
-#historicalforest <- resample(historicalforest, predictors)
-
-predictors <- addLayer(predictors, historicalforest)
-
-#mask out residential and water bodies
-water <- raster("tifs/repr-butmessedup/mask-water.tif")
-#water <- resample(water, predictors)
-resid <- raster("tifs/repr-butmessedup/mask-residential.tif")
-
-#beginCluster()
-predictors_masked <- mask(predictors, water, maskvalue=1, updatevalue = NA)
-predictors_masked <- mask(predictors_masked, resid, maskvalue=1, updatevalue = NA)
-#predictors_masked <- clusterR(predictors, mask, args=list(mask=water, maskvalue=1))
-#predictors_masked <- clusterR(predictors_masked, mask, args=list(mask=resid, maskvalue=1))
-
-#endCluster()
 
 #read in the training points
-points <- readOGR("data", "classes_all")
+points <- readOGR(".", "sample")
+points@data = data.frame(poly_type = points$stratum)
 
 #extract raster values for the points
-pred <- raster::extract(predictors_masked, points)
+pred <- raster::extract(predictors, points)
 points@data = data.frame(points@data, pred)
-points@data <- na.omit(points@data)
+points@data <- na.omit(points$tpi200)
 #points <- subset(points, tpi2k != NA)
 points@data <- droplevels(points@data)
 
@@ -84,20 +68,20 @@ points@data <- droplevels(points@data)
 #xdata <- points@data[,2:ncol(points@data)]
 
 # set the seed
-set.seed(23461)
-train.rf <- randomForest(com ~ ., data=points@data, importance=T, ntree=1500, do.trace=100, proximity=T, na.action=na.exclude) # apply the proper mtry and ntree
+set.seed(3461)
+train.rf <- randomForest(poly_type ~ tpi200 + aspect + channel_altitude + channel_base + convergence + hcurv + relative_slope_position + slope + shade + historicalforest, data=points@data, importance=T, ntree=1500, do.trace=100, proximity=T, na.action=na.exclude) # apply the proper mtry and ntree
 
 print(train.rf)
 # Variable Importance
-par(mfrow=c(4,4))
-for (i in 1:14) {
+par(mfrow=c(1,5))
+for (i in 1:5) {
   barplot(sort(train.rf$importance[,i], dec=T),
           main=attributes(train.rf$importance)$dimnames[[2]][i], cex.names=0.6)
 }
 
 #Look at just Mean Decrease in Accuracy:
 par(mfrow=c(1,1))
-barplot(sort(train.rf$importance[,13], dec=T),main="Mean Decrease in Accuracy", cex.names=0.6)
+barplot(sort(train.rf$importance[,5], dec=T),main="Mean Decrease in Gini Index", cex.names=0.6)
 
 #Outliers
 outlier <- outlier(train.rf)
@@ -107,7 +91,7 @@ plot(outlier, type="h", main="Outlier data points in the RF")
 
 # Predict classification and write it to a raster ----
 
-rpath=paste('~/Documents/GitHub/randomForest', "tifs/repr", sep="/")
+rpath=paste(getwd(), "tifs/repr", sep="/")
 xvars <- stack(paste(rpath, paste(rownames(train.rf$importance), "tif", sep="."), sep="/"))
 # #not working right now ----
 # 
@@ -131,6 +115,6 @@ xvars <- stack(paste(rpath, paste(rownames(train.rf$importance), "tif", sep=".")
 
 beginCluster()
 rf.pred <- clusterR(xvars, predict, args=list(model=train.rf), progress='text')
-writeRaster(rf.pred, filename = "rasterout1.tif", datatype='GTiff')
+writeRaster(rf.pred, filename = "rasterout.tif", datatype='GTiff', overwrite=T)
 endCluster()
 
