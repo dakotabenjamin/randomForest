@@ -28,39 +28,48 @@ library(snow)
 
 # Load data ----
 
-# Load the basic terrain analyses
-#catchment <- raster("tifs/repr/catchment.tif")
-#tpi2k <- raster("tifs/repr/tpi2k.tif")
-tpi200 <- raster("tifs/repr/tpi200.tif")
-aspect <- raster("tifs/repr/aspect.tif")
-channel_altitude <- raster("tifs/repr/channel_altitude.tif")
-channel_base <- raster("tifs/repr/channel_base.tif")
-convergence <- raster("tifs/repr/convergence.tif")
-hcurv <- raster("tifs/repr/hcurv.tif")
-#vcurv <- raster("tifs/repr/vcurv.tif")
-# There is something wrong with ls-factor ls_factor <- raster("tifs/repr/ls_factor.tif")
-relative_slope_position <- raster("tifs/repr/relative_slope_position.tif")
-shade <- raster("tifs/repr/shade.tif")
-#sinks <- raster("tifs/repr/sinks.tif")
-slope <- raster("tifs/repr/slope.tif")
-#twi <- raster("tifs/repr/twi.tif")
-#valley_depth <- raster("tifs/repr/valley_depth.tif")
-historicalforest <- raster("tifs/repr/historicalforest.tif")
+# Load the rasters
+catchment <- raster("tifs/repr/carea_merge.tif")
+#tpi2k <- raster("../")
+#tpi200 <- raster("tifs/repr/tpi200.tif")
+aspect <- raster("tifs/repr/aspect_merge.tif")
+channel_altitude <- raster("tifs/repr/chnl_alti_merge.tif")
+channel_base <- raster("tifs/repr/chnl_base_merge.tif")
+convergence <- raster("tifs/repr/convergence_merge.tif")
+hcurv <- raster("tifs/repr/hcurv_merge.tif")
+vcurv <- raster("tifs/repr/vcurv_merge.tif")
+ls_factor <- raster("tifs/repr/lsfactor_merge.tif")
+#relative_slope_position <- raster("tifs/repr/relative_slope_position.tif")
+shade <- raster("tifs/repr/shade_merge.tif")
+slope <- raster("tifs/repr/slope_merge.tif")
+twi <- raster("tifs/repr/wetness_merge.tif")
 
-#predictors <- addLayer(tpi2k, tpi200, aspect, channel_altitude, channel_base, convergence, hcurv, vcurv, relative_slope_position, shade, slope, valley_depth, twi)
-predictors <- addLayer(tpi200, aspect, channel_altitude, channel_base, convergence, hcurv, relative_slope_position, shade, slope, historicalforest)
+geology = readOGR("data/geology","geology_a_oh")
 
+# @TODO: look at the extent of this
+#historicalforest <- raster("tifs/repr/historicalforest.tif")
+
+#predictors = addLayer(tpi2k, tpi200, aspect, channel_altitude, channel_base, convergence, hcurv, vcurv, relative_slope_position, shade, slope, valley_depth, twi)
+predictors = addLayer(aspect, catchment, channel_altitude, channel_base, convergence, hcurv, vcurv, ls_factor, shade, slope, twi)
 
 #read in the training points
-points <- readOGR(".", "sample")
+points = readOGR(".", "training_points")
 points@data = data.frame(poly_type = points$stratum)
+#crs(points) = "+proj=lcc +lat_1=41.7 +lat_2=40.43333333333333 +lat_0=39.66666666666666 +lon_0=-82.5 +x_0=600000 +y_0=0 +ellps=GRS80 +datum=NAD83 +to_meter=0.3048006096012192 +no_defs "
 
 #extract raster values for the points
-pred <- raster::extract(predictors, points)
+pred = raster::extract(predictors, points)
 points@data = data.frame(points@data, pred)
-points@data <- na.omit(points$tpi200)
+#points@data <- na.omit(points$aspect_merge)
 #points <- subset(points, tpi2k != NA)
-points@data <- droplevels(points@data)
+points@data = droplevels(points@data)
+
+#Extract geology
+points.geo = as.vector(over(x=points, y=geology)$ORIG_LABEL)
+
+
+#add vector data to points
+points@data = data.frame(points@data, points.geo)
 
 # Random Forest Training ----
 
@@ -69,7 +78,7 @@ points@data <- droplevels(points@data)
 
 # set the seed
 set.seed(3461)
-train.rf <- randomForest(poly_type ~ tpi200 + aspect + channel_altitude + channel_base + convergence + hcurv + relative_slope_position + slope + shade + historicalforest, data=points@data, importance=T, ntree=1500, do.trace=100, proximity=T, na.action=na.exclude) # apply the proper mtry and ntree
+train.rf <- randomForest(poly_type ~ aspect_merge + carea_merge + chnl_alti_merge + chnl_base_merge + convergence_merge + hcurv_merge + vcurv_merge + lsfactor_merge + slope_merge + shade_merge + wetness_merge, data=points@data, importance=T, ntree=1500, do.trace=100, proximity=T, na.action=na.exclude) # apply the proper mtry and ntree
 
 print(train.rf)
 # Variable Importance
@@ -91,7 +100,7 @@ plot(outlier, type="h", main="Outlier data points in the RF")
 
 # Predict classification and write it to a raster ----
 
-rpath=paste(getwd(), "tifs/repr", sep="/")
+rpath=paste(getwd(), "tifs", sep="/")
 xvars <- stack(paste(rpath, paste(rownames(train.rf$importance), "tif", sep="."), sep="/"))
 # #not working right now ----
 # 
